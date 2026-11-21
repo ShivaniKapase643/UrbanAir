@@ -1,29 +1,80 @@
 # Urban Air Quality Assistant
 
-A complete air-quality assistant using the free Open-Meteo API. Search or geolocate, view live pollutants and forecasts, get rule-based personalised guidance, and compare cities.
+> Live air quality, 48-hour forecasts, and personalised health guidance for any city, built with strict TypeScript, a hardened Express proxy, and WCAG 2.1 AA accessibility.
 
-## Official Problem Statement
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
+![React](https://img.shields.io/badge/React-Vite-61dafb)
+![Tests](https://img.shields.io/badge/tests-36%20passing-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-98.76%25%20statements%20%7C%2086.66%25%20branches-brightgreen)
+![Lighthouse](https://img.shields.io/badge/Lighthouse-100%20perf%20%7C%20100%20a11y-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-blue)
+
+## Table of Contents
+
+1. [Overview](#overview)
+2. [Challenge Statement and Interpretation](#challenge-statement-and-interpretation)
+3. [Features](#features)
+4. [Screenshots](#screenshots)
+5. [Tech Stack](#tech-stack)
+6. [Architecture](#architecture)
+7. [Project Structure](#project-structure)
+8. [Getting Started](#getting-started)
+9. [Environment Variables](#environment-variables)
+10. [Scripts](#scripts)
+11. [API Reference](#api-reference)
+12. [Requirements Traceability](#requirements-traceability)
+13. [Evaluation Criteria Coverage](#evaluation-criteria-coverage)
+14. [Design Decisions](#design-decisions)
+15. [Limitations](#limitations)
+16. [Future Improvements](#future-improvements)
+17. [Contributing](#contributing)
+18. [License and Data Attribution](#license-and-data-attribution)
+
+---
+
+## Overview
+
+Urban Air Quality Assistant helps city residents understand the air they are breathing and decide what to do about it. A user searches for a city or shares their location, sees live pollutant levels and a plain-language air quality category, previews the next 24 to 48 hours, and receives practical advice tailored to who they are: a jogger, a parent, someone with asthma, an older adult, or a commuter.
+
+The project is designed to work out of the box. It needs no API keys, uses the free [Open-Meteo Air Quality API](https://open-meteo.com/en/docs/air-quality-api), and ships with a rule-based advice engine so every feature works without a paid service.
+
+## Challenge Statement and Interpretation
 
 > **Challenge 6: Urban Air Quality Assistant**
 >
-> The challenge provides only this title. The scope and technology are left to
-> the participant, and submissions are evaluated on six parameters: Code
-> Quality, Security, Efficiency, Testing, Accessibility, and Problem Statement
-> Alignment.
+> The challenge provides only this title. Scope and technology are left to the participant, and submissions are evaluated on six parameters: Code Quality, Security, Efficiency, Testing, Accessibility, and Problem Statement Alignment.
 
-## Interpretation of the Challenge
+Because the statement is open-ended, the title is interpreted word by word:
 
-Because the statement is open-ended, we interpret "Urban Air Quality Assistant" as a web application that helps city residents understand the air quality around them and decide what to do about it:
-
-1. **Urban**: works for any city, by name search or browser geolocation, and lets users compare two cities.
-2. **Air Quality**: shows live AQI and the main pollutants (PM2.5, PM10, NO2, O3, SO2, CO) with a plain-language category, plus a 24-48 hour forecast.
-3. **Assistant**: gives personalised, actionable guidance (jogging, kids, asthma, elderly, commuting, masks, windows) through a rule-based engine that needs no API key.
+| Word | Interpretation | Delivered as |
+|---|---|---|
+| **Urban** | Works for any city, by name or by location, and supports comparing cities | Debounced city search, browser geolocation, two-city comparison |
+| **Air Quality** | Presents live pollution data in a form non-experts can understand | AQI with a six-level category, pollutant readings, 24 to 48 hour forecast and trend |
+| **Assistant** | Turns data into personalised, actionable guidance | Profile-based rule engine (jogging, kids, asthma, elderly, commuting, masks, windows) |
 
 Every feature maps to one of these three parts. No unrelated features were added.
 
+## Features
+
+### Urban
+- City search with a 300 ms debounce and cancellation of stale requests.
+- Browser geolocation with handling for granted, denied, and unsupported states.
+- Two-city comparison shown side by side.
+
+### Air Quality
+- Live European AQI and PM2.5, PM10, NO2, O3, SO2, and CO readings.
+- Six-level category from Good to Hazardous, with a plain-language explanation.
+- 24 to 48 hour forecast as a lightweight SVG trend chart, plus an hourly data table.
+- Loading, empty, search, and upstream API error states.
+
+### Assistant
+- Personalised guidance for jogging, children, asthma, elderly users, and commuting.
+- Mask and window advice that changes with the air quality category.
+- The rule engine requires no API key and is always available.
+
 ## Screenshots
 
-No screenshot images are currently present in `docs/screenshots/`. Missing images that must be captured:
+The repository does not currently contain screenshot images. Add the following optimised WebP or PNG files under 200 KB each to enable this gallery:
 
 - `docs/screenshots/search.webp`
 - `docs/screenshots/forecast.webp`
@@ -34,56 +85,127 @@ No screenshot images are currently present in `docs/screenshots/`. Missing image
 - `docs/screenshots/mobile-view.webp`
 - `docs/screenshots/lighthouse.webp`
 
-## Requirements Traceability
+## Tech Stack
 
-| Part (Urban / Air Quality / Assistant) | Requirement | Feature | File path | Test name |
-|---|---|---|---|---|
-| Urban | Work for any city by name search | Debounced city search and city result selection | `src/App.tsx`, `src/hooks/useDebouncedValue.ts`, `src/services/air-quality-api.ts` | `Urban Air Assistant > renders empty state and search` |
-| Urban | Use browser geolocation | Geolocation handling for granted, denied, and unsupported states | `src/App.tsx` | `location and comparison > grants browser geolocation and loads the current location`; `location and comparison > handles denied browser geolocation gracefully`; `location and comparison > handles unsupported browser geolocation gracefully` |
-| Urban | Let users compare two cities | Side-by-side city comparison panel | `src/App.tsx` | `location and comparison > compares two cities side by side` |
-| Air Quality | Show live AQI and PM2.5, PM10, NO2, O3, SO2, and CO | Open-Meteo proxy and pollutant display | `server/routes/air-quality.ts`, `src/services/air-quality-api.ts`, `src/components/Pollutants.tsx` | `air quality services > maps Open-Meteo coordinates`; `Air quality API > handles upstream failure safely` |
-| Air Quality | Show a plain-language AQI category | Six-level category calculation and category card | `src/utils/aqi.ts`, `src/App.tsx` | `AQI categories > maps %i to %s` |
-| Air Quality | Show a 24-48 hour forecast and simple trend | Lazy-loaded SVG trend chart and hourly data table | `src/components/ForecastChart.tsx`, `src/App.tsx` | `main components > provides a chart text alternative` |
-| Air Quality | Gracefully handle loading, empty, and error states | Live status, empty-state card, alerts, cache fallback, and safe API errors | `src/App.tsx`, `server/index.ts`, `src/services/client-cache.ts` | `Urban Air Assistant > renders empty state and search`; `Air quality API > handles upstream failure safely` |
-| Assistant | Give personalised, actionable jogging advice | Rule-based jogging guidance | `src/utils/advice.ts`, `src/App.tsx` | `advice engine > covers personalised profiles` |
-| Assistant | Give personalised guidance for kids | Rule-based child guidance | `src/utils/advice.ts`, `src/App.tsx` | `advice engine > covers personalised profiles` |
-| Assistant | Give personalised guidance for asthma | Rule-based asthma guidance | `src/utils/advice.ts`, `src/App.tsx` | `advice engine > covers personalised profiles` |
-| Assistant | Give personalised guidance for elderly users | Rule-based elderly guidance | `src/utils/advice.ts`, `src/App.tsx` | `advice engine > covers personalised profiles` |
-| Assistant | Give personalised commuting advice | Rule-based commuting guidance | `src/utils/advice.ts`, `src/App.tsx` | `advice engine > covers personalised profiles` |
-| Assistant | Give mask and window advice | Rule-based exposure guidance | `src/utils/advice.ts`, `src/App.tsx` | `advice engine > covers Good through Hazardous branches` |
-| Assistant | Work without an API key through rules | Local rule engine used as the default | `src/utils/advice.ts`, `.env.example` | `advice engine > covers Good through Hazardous branches` |
-| Urban | Validate city and coordinate input | Zod city and latitude/longitude schemas | `server/middleware/validation.ts` | `input validation > accepts valid cities and coordinates`; `input validation > rejects malformed cities`; `input validation > rejects out-of-range coordinates` |
-| Urban | Cache air-quality results | 10-minute server and browser caches | `server/services/cache.ts`, `src/services/client-cache.ts` | `TtlCache > stores and retrieves values`; `TtlCache > expires values`; `air quality services > stores and retrieves client cache entries` |
-| Urban | Provide an accessible, responsive interface | Semantic landmarks, labels, live regions, focus, dark mode, reduced motion, and responsive layout | `src/App.tsx`, `src/index.css`, `index.html` | `Urban Air Assistant > has no detectable accessibility violations`; `main components > displays pollutant values accessibly` |
-
-## Gaps
-
-- The exact H2S platform statement was not supplied, so exact requirement wording beyond the title cannot be verified.
-- No screenshot or Lighthouse image files exist in `docs/screenshots/`; all missing capture paths are listed above.
-- No server-side LLM endpoint or implementation exists; the fully local rule engine is the complete assistant implementation.
-
-## Evaluation Criteria Coverage
-
-| Parameter | Evidence |
+| Layer | Technology |
 |---|---|
-| Code Quality | Strict TypeScript is configured in `tsconfig.json`, `tsconfig.app.json`, and `tsconfig.server.json`; the project separates frontend and Express server code into `src/` and `server/`; shared contracts use `src/types/air-quality.ts`. |
-| Security | Helmet and Zod are used in `server/index.ts` and `server/middleware/validation.ts`; CORS, rate limiting, host allow-listing, and eight-second upstream timeout handling are in `server/`; threat details are in `SECURITY.md`. |
-| Efficiency | City search is debounced for 300 ms in `src/App.tsx` and `src/hooks/useDebouncedValue.ts`; API and client caches use 10-minute TTLs; the chart is lazy-loaded from `src/App.tsx` and implemented in `src/components/ForecastChart.tsx`. |
-| Testing | 36 tests pass across `test/`; Vitest coverage reports 98.76% statements and 86.66% branches; API, component, unit, cache, validator, and axe accessibility suites are in `test/`. |
-| Accessibility | `src/App.tsx` provides semantic landmarks, a skip link, labels, and live regions; `src/index.css` provides visible focus, 44px targets, dark mode, and reduced motion; Lighthouse accessibility scored 100/100. |
-| Problem Statement Alignment | Traceability maps the Urban, Air Quality, and Assistant interpretation to real features, existing files, and exact test names; implementation gaps are disclosed in this README. |
+| Language | TypeScript 5.9.2 with strict frontend and server configurations |
+| Frontend | React 19.1.1, Vite 7.3.8 |
+| Backend | Node.js, Express 5.1.0 |
+| Validation | Zod 4.6.7 |
+| Security | Helmet 8.1.0, CORS 2.8.5, express-rate-limit 8.7.5 |
+| Performance | Compression, 10-minute TTL caches, lazy-loaded chart |
+| Testing | Vitest 5.1.1, React Testing Library, Supertest 7.1.4, jest-axe |
+| Quality tooling | ESLint 9.36.0, Prettier 3.6.2 |
+| CI | GitHub Actions |
+| Data source | Open-Meteo Air Quality and Geocoding APIs |
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  Browser[React + Vite] -->|Debounced /api requests| Express[Express proxy]
-  Express -->|Two-host allow-list + 8-second timeout| OpenMeteo[Open-Meteo APIs]
-  Express --> ServerCache[10-minute server TTL cache]
-  Browser --> ClientCache[10-minute client cache]
+  User([User]) --> UI[React + Vite UI]
+  UI -->|Debounced, cancellable /api requests| API[Express API]
+  UI --> ClientCache[(10-minute client cache)]
+  API --> Validate[Zod validation]
+  Validate --> ServerCache[(10-minute server TTL cache)]
+  ServerCache -->|Cache miss| Upstream[Open-Meteo APIs]
 ```
 
+**Request flow**
+
+1. The browser debounces city input and cancels stale requests with `AbortController`.
+2. Express validates all query input with Zod before processing it.
+3. Results are served from a 10-minute server cache when available.
+4. On a cache miss, the server calls Open-Meteo through an allow-listed host with an 8-second timeout.
+5. The frontend normalises upstream fields into typed air-quality contracts.
+6. Failures are converted to safe error messages; stack traces are not sent to clients.
+
+## Project Structure
+
+```text
+.
+├── src/
+│   ├── components/        # ForecastChart and Pollutants
+│   ├── hooks/             # Debounced value handling
+│   ├── services/          # API client and client-side cache
+│   ├── utils/             # AQI categories and rule-based advice
+│   ├── types/             # Shared TypeScript contracts
+│   ├── App.tsx            # Application composition
+│   └── index.css          # Theme, focus, dark mode, and responsive styles
+├── server/
+│   ├── routes/            # Geocoding and coordinate routes
+│   ├── services/          # Server TTL cache
+│   ├── middleware/        # Zod query validation
+│   └── index.ts           # Express app, security, CORS, and rate limiting
+├── test/                  # Unit, component, API, and accessibility tests
+├── public/                # Static favicon and icons
+├── docs/screenshots/      # README image location
+├── .github/workflows/     # CI pipeline
+├── SECURITY.md            # Threat model and mitigations
+├── CONTRIBUTING.md        # Contribution guide
+├── LICENSE               # MIT license
+├── lighthouse-results.json
+└── .env.example
+```
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 20 or newer
+- npm 10 or newer
+
+CI is configured for Node.js 20. No `engines` field is declared in `package.json`, so Node.js 20 is the documented compatibility baseline.
+
+### Installation
+
+```sh
+git clone https://github.com/ShivaniKapase643/UrbanAir.git
+cd UrbanAir
+npm install
+cp .env.example .env
+npm run dev
+```
+
+The Vite frontend and Express API start together. Vite uses port 5173 by default or chooses another available port; the API listens on port `8787` by default.
+
+### Production build
+
+```sh
+npm run build
+npm run preview
+```
+
+## Environment Variables
+
+All variables are optional. The project runs with none set.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | `8787` | Port the API listens on |
+| `FRONTEND_ORIGIN` | `http://localhost:5173` | Comma-separated allowed CORS origins |
+
+No environment variable is needed for air-quality data or rule-based advice.
+
+## Scripts
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Start frontend and backend in development |
+| `npm run dev:client` | Start only Vite |
+| `npm run dev:server` | Start only the Express API in watch mode |
+| `npm run build` | Strict type-check and production build |
+| `npm run preview` | Serve the production build locally |
+| `npm run lint` | ESLint with zero-warning policy |
+| `npm run format` | Format the codebase with Prettier |
+| `npm test` | Run the Vitest suite once |
+| `npm run test:coverage` | Run tests with coverage enforcement |
+| `npm run audit` | Audit dependencies at high severity or above |
+
 ## API Reference
+
+All query inputs are validated with Zod. Invalid requests return `400` with a generic safe message.
 
 ### `GET /api/health`
 
@@ -95,110 +217,165 @@ Returns the server health status.
 
 Searches Open-Meteo geocoding for city suggestions.
 
-- Query parameter: `name`
-- Validation: string, trimmed, 2-80 characters, Unicode letters and spaces plus `. , ' -` characters
-- Response `200`: upstream geocoding JSON, typically with a `results` array
-- Invalid input: `400` with `{ "error": "Invalid query parameters." }`
-- Upstream or network failure: `502` with `{ "error": "The upstream service is temporarily unavailable." }`
-- Requests are cached for 10 minutes.
+| Parameter | Rules |
+|---|---|
+| `name` | String, trimmed, 2 to 80 characters, and limited to Unicode letters, spaces, `.`, `,`, `'`, and `-` |
+
+- Response `200`: upstream geocoding JSON, usually containing `results`
+- Invalid input: `400` `{ "error": "Invalid query parameters." }`
+- Upstream failure: `502` `{ "error": "The upstream service is temporarily unavailable." }`
+- Cached in memory for 10 minutes
 
 ### `GET /api/air-quality/coordinates`
 
-Retrieves live and hourly European air quality values for coordinates.
+Retrieves live and hourly European air quality values.
 
-- Query parameters: `latitude`, `longitude`
-- Validation: latitude is coerced to a number from `-90` through `90`; longitude is coerced to a number from `-180` through `180`
-- Response `200`: Open-Meteo air-quality JSON
-- Invalid input: `400` with `{ "error": "Invalid query parameters." }`
-- Upstream or network failure: `502` with `{ "error": "The upstream service is temporarily unavailable." }`
-- Requests are cached for 10 minutes.
-
-Both proxy routes allow only `geocoding-api.open-meteo.com` or `air-quality-api.open-meteo.com`, use an eight-second abort timeout, and are subject to the global limit of 100 requests per minute.
-
-## Setup
-
-```sh
-npm install
-cp .env.example .env
-npm run dev
-```
-
-The frontend runs on Vite and the API on port 8787. Node.js 20 or newer is recommended and is used by CI.
-
-## Environment variables
-
-- `PORT`: API port, default `8787`
-- `FRONTEND_ORIGIN`: Comma-separated strict CORS origins, default `http://localhost:5173`
-
-## Scripts
-
-| Script | Purpose |
+| Parameter | Rules |
 |---|---|
-| `npm run dev` | Run the Express API and Vite frontend together |
-| `npm run dev:client` | Run only Vite |
-| `npm run dev:server` | Run only the Express API with `tsx` watch |
-| `npm run build` | Type-check frontend and server code, then build Vite |
-| `npm run lint` | Run ESLint with warnings disallowed |
-| `npm run format` | Format the repository with Prettier |
-| `npm test` | Run Vitest once |
-| `npm run test:coverage` | Run Vitest with coverage enforcement |
-| `npm run preview` | Preview the production Vite build |
-| `npm run audit` | Audit dependencies at high severity or above |
+| `latitude` | Coerced number between `-90` and `90` |
+| `longitude` | Coerced number between `-180` and `180` |
 
-## Testing
+- Response `200`: upstream Open-Meteo air-quality JSON
+- Invalid input: `400` `{ "error": "Invalid query parameters." }`
+- Upstream failure: `502` `{ "error": "The upstream service is temporarily unavailable." }`
+- Cached in memory for 10 minutes
 
-Vitest covers AQI categories, advice, validators, cache logic, components, API failures, and axe accessibility. No test calls the real upstream API.
+Both proxy routes call only `geocoding-api.open-meteo.com` or `air-quality-api.open-meteo.com`, use an 8-second abort timeout, and are behind the global limit of 100 requests per minute.
 
-- Test files: 8
-- Tests: 36 passed
-- Statement coverage: 98.76%
-- Branch coverage: 86.66%
-- Function coverage: 95.65%
-- Line coverage: 100%
+## Requirements Traceability
 
-## Security
+| Part | Requirement | Implementation | Tests |
+|---|---|---|---|
+| Urban | Search any city by name | `src/App.tsx`, `src/hooks/useDebouncedValue.ts`, `src/services/air-quality-api.ts` | `Urban Air Assistant > renders empty state and search` |
+| Urban | Use browser geolocation | `src/App.tsx` | `location and comparison > grants browser geolocation and loads the current location`; `location and comparison > handles denied browser geolocation gracefully`; `location and comparison > handles unsupported browser geolocation gracefully` |
+| Urban | Compare two cities | `src/App.tsx` | `location and comparison > compares two cities side by side` |
+| Urban | Validate city and coordinate input | `server/middleware/validation.ts` | `input validation > accepts valid cities and coordinates`; `input validation > rejects malformed cities`; `input validation > rejects out-of-range coordinates` |
+| Urban | Cache results | `server/services/cache.ts`, `src/services/client-cache.ts` | `TtlCache > stores and retrieves values`; `TtlCache > expires values`; `air quality services > stores and retrieves client cache entries` |
+| Air Quality | Live AQI and pollutants | `server/routes/air-quality.ts`, `src/services/air-quality-api.ts`, `src/components/Pollutants.tsx` | `air quality services > maps Open-Meteo coordinates`; `Air quality API > handles upstream failure safely` |
+| Air Quality | Plain-language six-level category | `src/utils/aqi.ts`, `src/App.tsx` | `AQI categories > maps %i to %s` |
+| Air Quality | 24 to 48 hour forecast and trend | `src/components/ForecastChart.tsx`, `src/App.tsx` | `main components > provides a chart text alternative` |
+| Air Quality | Loading, empty, and upstream error states | `src/App.tsx`, `server/index.ts`, `src/services/client-cache.ts` | `Urban Air Assistant > renders empty state and search`; `Air quality API > handles upstream failure safely` |
+| Assistant | Personalised jogging, child, asthma, elderly, and commuting advice | `src/utils/advice.ts`, `src/App.tsx` | `advice engine > covers personalised profiles` |
+| Assistant | Mask and window advice across all categories | `src/utils/advice.ts` | `advice engine > covers Good through Hazardous branches` |
+| Assistant | Work with no API key | `src/utils/advice.ts`, `.env.example` | `advice engine > covers Good through Hazardous branches` |
+| All | Accessible, responsive interface | `src/App.tsx`, `src/index.css`, `index.html` | `Urban Air Assistant > has no detectable accessibility violations`; `main components > displays pollutant values accessibly` |
 
-See [SECURITY.md](SECURITY.md). For contributions, see [CONTRIBUTING.md](CONTRIBUTING.md).
+## Evaluation Criteria Coverage
 
-## Accessibility
+### 1. Code Quality
 
-One h1, semantic landmarks, skip navigation, labelled controls, live status and alerts, chart text alternative, 44px controls, visible focus, dark mode, and reduced motion.
+- Strict TypeScript across frontend and server configurations.
+- Clear separation of UI, hooks, services, utilities, types, routes, middleware, and server services.
+- Shared typed contracts in `src/types/air-quality.ts`.
+- Small public utilities in `src/utils/aqi.ts` and `src/utils/advice.ts`.
+- ESLint and Prettier scripts with a zero-warning lint command.
+- Centralised Express error handling in `server/index.ts`.
 
-## Performance
+### 2. Security
 
-- City-search debounce: 300 ms
-- In-flight request cancellation: `AbortController`
-- Server cache TTL: 10 minutes
-- Browser cache TTL: 10 minutes
-- Lazy-loaded chart: React `Suspense` and lightweight SVG
-- Response compression: Express compression middleware
+| Threat | Mitigation | Location |
+|---|---|---|
+| Malformed or malicious input | Zod validation for city names and coordinate ranges | `server/middleware/validation.ts` |
+| Cross-site scripting | React text rendering and no `dangerouslySetInnerHTML`; restrictive CSP | `src/App.tsx`, `server/index.ts` |
+| Abuse and denial of service | 100-request-per-minute rate limiting and 16 KB JSON limit | `server/index.ts` |
+| Server-side request forgery | Fixed Open-Meteo hosts, URL construction, and 8-second timeout | `server/routes/air-quality.ts` |
+| Cross-origin abuse | CORS origin allow-list | `server/index.ts` |
+| Information leakage | Generic error responses without stack traces | `server/index.ts` |
+| Header and privacy hardening | Helmet, CSP, Permissions-Policy, Referrer-Policy, and nosniff | `server/index.ts` |
+| Secret exposure | `.env` is git-ignored and `.env.example` contains no real secret | `.gitignore`, `.env.example` |
+| Vulnerable dependencies | High-severity audit in CI | `.github/workflows/ci.yml` |
 
-<!-- lighthouse-results:start -->
-### Lighthouse and bundle results
+The full threat model is in [SECURITY.md](SECURITY.md).
 
-Run on: November 21, 2026, against the Vite production preview at `http://127.0.0.1:4173/` using Lighthouse 12.8.2 in headless mode.
+### 3. Efficiency
 
-- Performance: **100/100**
-- Accessibility: **100/100**
-- Best Practices: **96/100**
-- SEO: **91/100**
-- Machine-readable report: [lighthouse-results.json](lighthouse-results.json)
-- Production HTML: 0.60 kB (0.36 kB gzip)
-- Production JavaScript: 197.29 kB (62.89 kB gzip), plus a 1.41 kB lazy chart chunk (0.70 kB gzip)
-- Production CSS: 7.07 kB (2.29 kB gzip)
+- Debounced search reduces unnecessary city requests.
+- Request cancellation uses `AbortController`.
+- Server and browser caches retain values for 10 minutes.
+- The forecast chart is lazy-loaded with `React.Suspense`.
+- The chart uses handwritten SVG and a native table rather than a chart library.
+- Express compression middleware compresses responses.
 
-The Lighthouse report image is missing at `docs/screenshots/lighthouse.webp`.
-<!-- lighthouse-results:end -->
+**Measured results** (Lighthouse 12.8.2, headless, Vite production preview, November 21, 2026):
 
-## License
+| Metric | Result |
+|---|---|
+| Performance | 100 |
+| Accessibility | 100 |
+| Best Practices | 96 |
+| SEO | 91 |
+| Production JavaScript | 197.29 kB (62.89 kB gzip) |
+| Lazy chart chunk | 1.41 kB (0.70 kB gzip) |
+| Production CSS | 7.07 kB (2.29 kB gzip) |
+| HTML | 0.60 kB (0.36 kB gzip) |
 
-MIT — see [LICENSE](LICENSE).
+The full report is linked in [lighthouse-results.json](lighthouse-results.json).
 
-## Repository
+### 4. Testing
 
-https://github.com/ShivaniKapase643/UrbanAir.git
+- Frameworks: Vitest, React Testing Library, Supertest, and jest-axe.
+- Unit tests cover AQI categories, advice, validators, cache logic, and API services.
+- Component tests cover search, loaded results, geolocation states, comparison, chart alternatives, and accessibility.
+- API tests cover health, invalid coordinates and city names, security headers, and upstream failure.
+- Network access is mocked; tests do not call the real upstream API.
+- Latest full run: 36 tests across 8 test files pass.
+- Coverage: 98.76% statements, 86.66% branches, 95.65% functions, and 100% lines.
+- CI runs lint, coverage tests, build, and audit.
 
-## Future improvements
+### 5. Accessibility
+
+The interface targets WCAG 2.1 AA.
+
+- Semantic landmarks, a single `h1`, logical heading order, and a skip-to-content link.
+- Every control is labelled and fully keyboard operable, with visible focus styles.
+- Loading and error messages use live regions and `role="status"` or `role="alert"`.
+- AQI uses text labels and icons in addition to border/category colour.
+- The forecast chart has an accessible name and a full hourly data table.
+- Touch targets are at least 44 px, the layout is responsive, and dark mode and reduced motion are supported.
+- Lighthouse accessibility score: 100.
+
+### 6. Problem Statement Alignment
+
+- The challenge title is interpreted explicitly as Urban, Air Quality, and Assistant.
+- The traceability table links each interpretation to real files and test names.
+- No unrelated features were added.
+- The assistant works locally with no API key or paid service.
+
+## Design Decisions
+
+| Decision | Reason |
+|---|---|
+| Open-Meteo as the data source | Free, keyless, and covers geocoding, current readings, and forecasts |
+| Express proxy instead of direct browser calls | Central place for validation, caching, rate limiting, and host allow-listing |
+| Rule-based advice as the default | Deterministic, testable, instant, and free of external dependencies |
+| Hand-written SVG chart | Keeps the bundle small and makes an accessible table straightforward |
+| In-memory caches | Simple and sufficient for a single-instance deployment |
+
+## Limitations
+
+- The in-memory server cache is per process; a multi-instance deployment would need shared caching.
+- Air-quality values come from modelled data and may differ from local ground-station readings.
+- Advice is general guidance and is not medical advice.
+- No screenshot images are committed yet.
+
+## Future Improvements
 
 - Persisted profile preferences
-- Notification controls with explicit consent
+- Opt-in notifications when air quality crosses a chosen threshold
+- Local-language support
+- Installable PWA with offline access to the last result
+- Shared cache for multi-instance deployments
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, code style, and testing expectations. Before opening a pull request, run:
+
+```sh
+npm run lint && npm test && npm run build
+```
+
+## License and Data Attribution
+
+Released under the [MIT License](LICENSE).
+
+Air quality and geocoding data are provided by [Open-Meteo](https://open-meteo.com/) under the terms described on their website.

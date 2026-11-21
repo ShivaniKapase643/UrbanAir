@@ -1,5 +1,4 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
-import './App.css'
 import { Pollutants } from './components/Pollutants'
 import { useDebouncedValue } from './hooks/useDebouncedValue'
 import { getCoordinates, searchCities } from './services/air-quality-api'
@@ -29,8 +28,14 @@ function App() {
   useEffect(() => {
     if (debouncedQuery.trim().length < 2) { setSuggestions([]); return }
     const controller = new AbortController()
-    searchCities(debouncedQuery, controller.signal).then(setSuggestions).catch((cause: unknown) => {
-      if (!(cause instanceof DOMException && cause.name === 'AbortError')) setError(cause instanceof Error ? cause.message : 'City search failed.')
+    searchCities(debouncedQuery, controller.signal).then((results) => {
+      setSuggestions(results)
+      if (results.length === 0) setStatus(`No cities found for “${debouncedQuery.trim()}”`)
+      else setStatus('')
+    }).catch((cause: unknown) => {
+      if (!(cause instanceof DOMException && cause.name === 'AbortError')) {
+        setError(cause instanceof Error ? cause.message : 'City search failed.')
+      }
     })
     return () => controller.abort()
   }, [debouncedQuery])
@@ -52,20 +57,38 @@ function App() {
     try {
       const data = cached ?? await getCoordinates(location.latitude, location.longitude, controller.signal, location.name)
       if (!cached) writeClientCache(cacheKey, data)
-      if (isComparison) setSecondary(data)
-      else setPrimary(data)
+      if (isComparison) {
+        setSecondary(data)
+        setCompareQuery(location.name)
+        setCompareSuggestions([])
+      } else {
+        setPrimary(data)
+        setQuery(location.name)
+        setSuggestions([])
+      }
       setStatus(`Air quality loaded for ${location.name}`)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not load air quality. Check your connection.')
+      setStatus('')
     } finally { setLoading(false) }
   }, [])
 
   const useGeolocation = useCallback(() => {
-    if (!navigator.geolocation) { setError('Geolocation is not supported by this browser.') ; return }
+    if (!navigator.geolocation) {
+      setStatus('')
+      setError('Geolocation is not supported by this browser.')
+      return
+    }
     setLoading(true)
+    setError('')
+    setStatus('Waiting for location permission…')
     navigator.geolocation.getCurrentPosition(
       (position) => { void loadLocation({ name: 'Your location', latitude: position.coords.latitude, longitude: position.coords.longitude }) },
-      () => { setLoading(false); setError('Location permission was denied. Search for a city instead.') },
+      () => {
+        setLoading(false)
+        setStatus('')
+        setError('Location permission was denied. Search for a city instead.')
+      },
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
     )
   }, [loadLocation])
@@ -81,7 +104,10 @@ function App() {
         <section className="search-panel" aria-labelledby="search-heading">
           <h2 id="search-heading">Check a city</h2>
           <div className="search-row">
-            <div className="field"><label htmlFor="city-search">City name</label><input id="city-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="e.g. Chicago" autoComplete="off" /></div>
+            <div className="field">
+              <label htmlFor="city-search">City name</label>
+              <input id="city-search" value={query} onChange={(event) => { setQuery(event.target.value); setError(''); setStatus('') }} placeholder="e.g. Chicago" autoComplete="off" />
+            </div>
             <button type="button" className="secondary" onClick={useGeolocation}>Use my location</button>
           </div>
           {suggestions.length > 0 && <ul className="suggestions" aria-label="City results">{suggestions.map((location) => <li key={`${location.latitude}-${location.longitude}`}><button type="button" onClick={() => void loadLocation(location)}>{location.name}{location.country ? `, ${location.country}` : ''}</button></li>)}</ul>}

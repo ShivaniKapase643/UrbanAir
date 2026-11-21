@@ -4,6 +4,7 @@ import express from 'express'
 import rateLimit from 'express-rate-limit'
 import helmet from 'helmet'
 import type { ErrorRequestHandler } from 'express'
+import path from 'node:path'
 import { airQualityRouter } from './routes/air-quality.js'
 
 const app = express()
@@ -36,6 +37,19 @@ app.use('/api/air-quality', airQualityRouter)
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
 
+const distDirectory = path.resolve(process.cwd(), 'dist')
+app.use(express.static(distDirectory, { index: false, maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0 }))
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(distDirectory, 'index.html'))
+})
+app.use((req, res, next) => {
+  if (req.method === 'GET' && !req.path.startsWith('/api/')) {
+    res.sendFile(path.join(distDirectory, 'index.html'))
+    return
+  }
+  next()
+})
+
 const errorHandler: ErrorRequestHandler = (_error, _req, res, next) => {
   void next
   res.status(502).json({ error: 'The upstream service is temporarily unavailable.' })
@@ -45,5 +59,5 @@ app.use(errorHandler)
 export { app }
 
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(port, () => console.log(`Urban Air API listening on ${port}`))
+  app.listen(port, () => console.log(`Urban Air API and frontend listening on ${port}`))
 }
