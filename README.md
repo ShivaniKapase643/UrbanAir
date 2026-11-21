@@ -17,7 +17,7 @@ Because the statement is open-ended, we interpret "Urban Air Quality Assistant" 
 
 1. **Urban**: works for any city, by name search or browser geolocation, and lets users compare two cities.
 2. **Air Quality**: shows live AQI and the main pollutants (PM2.5, PM10, NO2, O3, SO2, CO) with a plain-language category, plus a 24-48 hour forecast.
-3. **Assistant**: gives personalised, actionable guidance (jogging, kids, asthma, elderly, commuting, masks, windows) through a rule-based engine that needs no API key, with an optional server-side LLM.
+3. **Assistant**: gives personalised, actionable guidance (jogging, kids, asthma, elderly, commuting, masks, windows) through a rule-based engine that needs no API key.
 
 Every feature maps to one of these three parts. No unrelated features were added.
 
@@ -52,8 +52,6 @@ No screenshot images are currently present in `docs/screenshots/`. Missing image
 | Assistant | Give personalised commuting advice | Rule-based commuting guidance | `src/utils/advice.ts`, `src/App.tsx` | `advice engine > covers personalised profiles` |
 | Assistant | Give mask and window advice | Rule-based exposure guidance | `src/utils/advice.ts`, `src/App.tsx` | `advice engine > covers Good through Hazardous branches` |
 | Assistant | Work without an API key through rules | Local rule engine used as the default | `src/utils/advice.ts`, `.env.example` | `advice engine > covers Good through Hazardous branches` |
-| Assistant | Optionally support a server-side LLM | Reserved environment variables and local fallback. The rule-based engine is the default and fully satisfies the assistant requirement; the server-side LLM is an optional enhancement and is not required to run the project. | `.env.example`, `src/utils/advice.ts` | `advice engine > covers personalised profiles` |
-| Assistant | Keep the rule-based engine as the default | Rule-based guidance remains the no-key path | `src/utils/advice.ts` | `advice engine > covers personalised profiles` |
 | Urban | Validate city and coordinate input | Zod city and latitude/longitude schemas | `server/middleware/validation.ts` | `input validation > accepts valid cities and coordinates`; `input validation > rejects malformed cities`; `input validation > rejects out-of-range coordinates` |
 | Urban | Cache air-quality results | 10-minute server and browser caches | `server/services/cache.ts`, `src/services/client-cache.ts` | `TtlCache > stores and retrieves values`; `TtlCache > expires values`; `air quality services > stores and retrieves client cache entries` |
 | Urban | Provide an accessible, responsive interface | Semantic landmarks, labels, live regions, focus, dark mode, reduced motion, and responsive layout | `src/App.tsx`, `src/index.css`, `index.html` | `Urban Air Assistant > has no detectable accessibility violations`; `main components > displays pollutant values accessibly` |
@@ -62,14 +60,14 @@ No screenshot images are currently present in `docs/screenshots/`. Missing image
 
 - The exact H2S platform statement was not supplied, so exact requirement wording beyond the title cannot be verified.
 - No screenshot or Lighthouse image files exist in `docs/screenshots/`; all missing capture paths are listed above.
-- No server-side LLM implementation is currently present. The optional enhancement is represented by environment variable entries, and rule-based advice fully covers the assistant requirement.
+- No server-side LLM endpoint or implementation exists; the fully local rule engine is the complete assistant implementation.
 
 ## Evaluation Criteria Coverage
 
 | Parameter | Evidence |
 |---|---|
-| Code Quality | Strict TypeScript is configured in `tsconfig.json` and `tsconfig.app.json`; the project separates frontend and Express server code into `src/` and `server/`; shared contracts use the types in `src/types/air-quality.ts`. |
-| Security | Helmet and Zod are used in `server/index.ts` and `server/middleware/validation.ts`; CORS, rate limiting, host allow-listing, cache limits, and timeout handling are in `server/`; threat details are documented in `SECURITY.md`. |
+| Code Quality | Strict TypeScript is configured in `tsconfig.json`, `tsconfig.app.json`, and `tsconfig.server.json`; the project separates frontend and Express server code into `src/` and `server/`; shared contracts use `src/types/air-quality.ts`. |
+| Security | Helmet and Zod are used in `server/index.ts` and `server/middleware/validation.ts`; CORS, rate limiting, host allow-listing, and eight-second upstream timeout handling are in `server/`; threat details are in `SECURITY.md`. |
 | Efficiency | City search is debounced for 300 ms in `src/App.tsx` and `src/hooks/useDebouncedValue.ts`; API and client caches use 10-minute TTLs; the chart is lazy-loaded from `src/App.tsx` and implemented in `src/components/ForecastChart.tsx`. |
 | Testing | 36 tests pass across `test/`; Vitest coverage reports 98.76% statements and 86.66% branches; API, component, unit, cache, validator, and axe accessibility suites are in `test/`. |
 | Accessibility | `src/App.tsx` provides semantic landmarks, a skip link, labels, and live regions; `src/index.css` provides visible focus, 44px targets, dark mode, and reduced motion; Lighthouse accessibility scored 100/100. |
@@ -85,6 +83,38 @@ flowchart LR
   Browser --> ClientCache[10-minute client cache]
 ```
 
+## API Reference
+
+### `GET /api/health`
+
+Returns the server health status.
+
+- Response `200`: `{ "status": "ok" }`
+
+### `GET /api/air-quality/geocoding`
+
+Searches Open-Meteo geocoding for city suggestions.
+
+- Query parameter: `name`
+- Validation: string, trimmed, 2-80 characters, Unicode letters and spaces plus `. , ' -` characters
+- Response `200`: upstream geocoding JSON, typically with a `results` array
+- Invalid input: `400` with `{ "error": "Invalid query parameters." }`
+- Upstream or network failure: `502` with `{ "error": "The upstream service is temporarily unavailable." }`
+- Requests are cached for 10 minutes.
+
+### `GET /api/air-quality/coordinates`
+
+Retrieves live and hourly European air quality values for coordinates.
+
+- Query parameters: `latitude`, `longitude`
+- Validation: latitude is coerced to a number from `-90` through `90`; longitude is coerced to a number from `-180` through `180`
+- Response `200`: Open-Meteo air-quality JSON
+- Invalid input: `400` with `{ "error": "Invalid query parameters." }`
+- Upstream or network failure: `502` with `{ "error": "The upstream service is temporarily unavailable." }`
+- Requests are cached for 10 minutes.
+
+Both proxy routes allow only `geocoding-api.open-meteo.com` or `air-quality-api.open-meteo.com`, use an eight-second abort timeout, and are subject to the global limit of 100 requests per minute.
+
 ## Setup
 
 ```sh
@@ -93,32 +123,42 @@ cp .env.example .env
 npm run dev
 ```
 
-The frontend runs on Vite and the API on port 8787.
+The frontend runs on Vite and the API on port 8787. Node.js 20 or newer is recommended and is used by CI.
 
 ## Environment variables
 
 - `PORT`: API port, default `8787`
-- `FRONTEND_ORIGIN`: Comma-separated strict CORS origins
-- `LLM_API_KEY`: Reserved optional key; not required
-- `LLM_API_URL`: Reserved optional endpoint; not required
+- `FRONTEND_ORIGIN`: Comma-separated strict CORS origins, default `http://localhost:5173`
 
 ## Scripts
 
-- `npm run dev`: frontend and backend
-- `npm run build`: strict frontend build
-- `npm run lint`: ESLint
-- `npm run format`: Prettier
-- `npm test`: unit/component/API tests
-- `npm run test:coverage`: coverage enforcement
-- `npm run audit`: dependency audit
+| Script | Purpose |
+|---|---|
+| `npm run dev` | Run the Express API and Vite frontend together |
+| `npm run dev:client` | Run only Vite |
+| `npm run dev:server` | Run only the Express API with `tsx` watch |
+| `npm run build` | Type-check frontend and server code, then build Vite |
+| `npm run lint` | Run ESLint with warnings disallowed |
+| `npm run format` | Format the repository with Prettier |
+| `npm test` | Run Vitest once |
+| `npm run test:coverage` | Run Vitest with coverage enforcement |
+| `npm run preview` | Preview the production Vite build |
+| `npm run audit` | Audit dependencies at high severity or above |
 
 ## Testing
 
 Vitest covers AQI categories, advice, validators, cache logic, components, API failures, and axe accessibility. No test calls the real upstream API.
 
+- Test files: 8
+- Tests: 36 passed
+- Statement coverage: 98.76%
+- Branch coverage: 86.66%
+- Function coverage: 95.65%
+- Line coverage: 100%
+
 ## Security
 
-See [SECURITY.md](SECURITY.md).
+See [SECURITY.md](SECURITY.md). For contributions, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Accessibility
 
@@ -143,15 +183,22 @@ Run on: November 21, 2026, against the Vite production preview at `http://127.0.
 - Best Practices: **96/100**
 - SEO: **91/100**
 - Machine-readable report: [lighthouse-results.json](lighthouse-results.json)
-- Production JavaScript: 197.29 KB (62.89 KB gzip), plus a 1.41 KB lazy chart chunk (0.70 KB gzip)
-- Production CSS: 7.07 KB (2.29 KB gzip)
-- HTML: 0.59 KB (0.35 KB gzip)
+- Production HTML: 0.60 kB (0.36 kB gzip)
+- Production JavaScript: 197.29 kB (62.89 kB gzip), plus a 1.41 kB lazy chart chunk (0.70 kB gzip)
+- Production CSS: 7.07 kB (2.29 kB gzip)
 
 The Lighthouse report image is missing at `docs/screenshots/lighthouse.webp`.
 <!-- lighthouse-results:end -->
 
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+## Repository
+
+https://github.com/ShivaniKapase643/UrbanAir.git
+
 ## Future improvements
 
-- Optional server-side LLM integration with strict prompt/result validation
 - Persisted profile preferences
 - Notification controls with explicit consent
