@@ -38,11 +38,19 @@ app.use('/api/air-quality', airQualityRouter)
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
 
 const distDirectory = path.resolve(process.cwd(), 'dist')
+app.use('/assets', express.static(path.join(distDirectory, 'assets'), {
+  immutable: true,
+  maxAge: process.env.NODE_ENV === 'production' ? '1y' : 0,
+}))
 app.use(express.static(distDirectory, { index: false, maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0 }))
 app.get('/', (_req, res) => {
   res.sendFile(path.join(distDirectory, 'index.html'))
 })
 app.use((req, res, next) => {
+  if (req.method === 'GET' && req.path.startsWith('/assets/')) {
+    res.status(404).json({ error: 'Static asset not found.' })
+    return
+  }
   if (req.method === 'GET' && !req.path.startsWith('/api/')) {
     res.sendFile(path.join(distDirectory, 'index.html'))
     return
