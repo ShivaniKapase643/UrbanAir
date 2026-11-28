@@ -56,6 +56,19 @@ describe('location and comparison', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/not supported/i)
   })
 
+  it('handles geolocation timeout gracefully', async () => {
+    setGeolocation({
+      getCurrentPosition(_success, error) {
+        error?.({ code: 3, message: 'Location timeout', PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 } as GeolocationPositionError)
+      },
+      watchPosition: vi.fn(),
+      clearWatch: vi.fn(),
+    })
+    render(<App />)
+    await userEvent.click(screen.getByRole('button', { name: /use my location/i }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/permission was denied/i)
+  })
+
   it('compares two cities side by side', async () => {
     setGeolocation(undefined)
     render(<App />)

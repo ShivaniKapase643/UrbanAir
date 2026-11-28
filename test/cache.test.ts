@@ -1,9 +1,38 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { TtlCache } from '../server/services/cache'
 
+const shortTtlMs = 1
+const normalTtlMs = 1000
+
 describe('TtlCache', () => {
-  beforeEach(() => {})
-  it('stores and retrieves values', () => { const cache = new TtlCache<string>(1000); cache.set('x','value'); expect(cache.get('x')).toBe('value') })
-  it('expires values', () => { const cache = new TtlCache<string>(1); cache.set('x','value'); expect(cache.get('x')).toBe('value'); return new Promise((resolve) => setTimeout(() => { expect(cache.get('x')).toBeUndefined(); resolve(undefined) }, 5)) })
-  it('clears values', () => { const cache = new TtlCache<string>(1000); cache.set('x','value'); cache.clear(); expect(cache.get('x')).toBeUndefined() })
+  it('stores and retrieves values', () => {
+    const cache = new TtlCache<string>(normalTtlMs)
+
+    cache.set('location', 'Chicago')
+
+    expect(cache.get('location')).toBe('Chicago')
+  })
+
+  it('expires values', () => {
+    const cache = new TtlCache<string>(shortTtlMs)
+    cache.set('location', 'Chicago')
+
+    expect(cache.get('location')).toBe('Chicago')
+
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        expect(cache.get('location')).toBeUndefined()
+        resolve(undefined)
+      }, 5)
+    })
+  })
+
+  it('clears values', () => {
+    const cache = new TtlCache<string>(normalTtlMs)
+    cache.set('location', 'Chicago')
+
+    cache.clear()
+
+    expect(cache.get('location')).toBeUndefined()
+  })
 })
