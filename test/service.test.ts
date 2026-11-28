@@ -77,6 +77,17 @@ describe('air quality services', () => {
     expect(result.hourly).toHaveLength(0)
   })
 
+  it('handles malformed geocoding and air-quality payloads safely', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ results: 'invalid' })))
+    expect(await searchCities('Invalid', new AbortController().signal)).toEqual([])
+
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse('invalid')))
+    const result = await getCoordinates(0, 0, new AbortController().signal)
+
+    expect(result.current.aqi).toBe(0)
+    expect(result.hourly).toEqual([])
+  })
+
   it('throws a safe API error', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ error: 'Unavailable' }, 503)))
 
@@ -97,5 +108,40 @@ describe('air quality services', () => {
 
     localStorage.setItem('urban-air:expired', JSON.stringify({ value: 1, expiresAt: 1 }))
     expect(readClientCache('expired')).toBeUndefined()
+  })
+
+  it('handles string and malformed pollutant values safely', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({
+      latitude: '41.8',
+      longitude: 'invalid',
+      timezone: 42,
+      current: { european_aqi: '42', pm2_5: 'invalid' },
+      hourly: {
+        time: ['2026-11-21T00:00', 42],
+        european_aqi: ['42', null],
+      },
+    })))
+
+    const result = await getCoordinates(0, 0, new AbortController().signal)
+
+    expect(result.location.latitude).toBe(41.8)
+    expect(result.location.longitude).toBe(0)
+    expect(result.timezone).toBe('UTC')
+    expect(result.current.aqi).toBe(42)
+    expect(result.current.pm2_5).toBe(0)
+  })
+
+  it('filters malformed geocoding entries and handles non-JSON upstream errors', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({
+      results: [null, { name: 'Missing coordinates' }, { name: 'Chicago', latitude: 41.8, longitude: -87.6 }],
+    })))
+
+    const validResults = await searchCities('Chicago', new AbortController().signal)
+
+    expect(validResults).toHaveLength(1)
+
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('not json', { status: 503 })))
+
+    await expect(searchCities('Chicago', new AbortController().signal)).rejects.toThrow('Request failed.')
   })
 })

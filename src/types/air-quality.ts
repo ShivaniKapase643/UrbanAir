@@ -40,5 +40,3 @@ export interface AdviceProfile {
   elderly: boolean
   commuting: boolean
 }
-
-export interface ApiError { error: string }

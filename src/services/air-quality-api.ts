@@ -3,51 +3,124 @@ import type { AirQualityData, Location, PollutantValues } from '../types/air-qua
 const API_BASE = '/api/air-quality'
 
 interface GeocodingResponse {
-  results?: Array<{
-    name: string
-    latitude: number
-    longitude: number
-    country?: string
-  }>
+  results?: Location[]
 }
 
 interface AirQualityResponse {
   latitude: number
   longitude: number
   timezone: string
-  current: Record<string, number>
-  hourly: Record<string, Array<number | string>>
+  current: Record<string, unknown>
+  hourly: Record<string, unknown>
 }
 
-async function readJson<T>(url: string, signal: AbortSignal): Promise<T> {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function readNumber(value: unknown, fallback = 0): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : fallback
+  }
+
+  return fallback
+}
+
+function readStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value.filter((item): item is string => typeof item === 'string')
+}
+
+function readPollutantArray(value: unknown): Array<number | string | null> {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value.filter((item): item is number | string | null =>
+    typeof item === 'number' || typeof item === 'string' || item === null,
+  )
+}
+
+function isLocation(value: unknown): value is Location {
+  if (!isRecord(value)) {
+    return false
+  }
+
+  return typeof value.name === 'string'
+    && typeof value.latitude === 'number'
+    && typeof value.longitude === 'number'
+}
+
+function validateGeocodingResponse(value: unknown): GeocodingResponse {
+  if (!isRecord(value) || !Array.isArray(value.results)) {
+    return {}
+  }
+
+  const results = value.results
+    .filter(isLocation)
+    .map((item) => ({
+      name: item.name,
+      latitude: item.latitude,
+      longitude: item.longitude,
+      country: typeof item.country === 'string' ? item.country : undefined,
+    }))
+
+  return { results }
+}
+
+function validateAirQualityResponse(value: unknown): AirQualityResponse {
+  if (!isRecord(value)) {
+    return {
+      latitude: 0,
+      longitude: 0,
+      timezone: 'UTC',
+      current: {},
+      hourly: { time: [] },
+    }
+  }
+
+  return {
+    latitude: readNumber(value.latitude),
+    longitude: readNumber(value.longitude),
+    timezone: typeof value.timezone === 'string' ? value.timezone : 'UTC',
+    current: isRecord(value.current) ? value.current : {},
+    hourly: isRecord(value.hourly) ? value.hourly : { time: [] },
+  }
+}
+
+async function readJson(url: string, signal: AbortSignal): Promise<unknown> {
   const response = await fetch(url, {
     signal,
     headers: { Accept: 'application/json' },
   })
 
   if (!response.ok) {
-    const body = await response.json().catch(() => ({ error: 'Request failed.' })) as { error?: string }
-    throw new Error(body.error ?? 'Request failed.')
+    const unknownBody = await response.json().catch(() => ({ error: 'Request failed.' }))
+
+    if (isRecord(unknownBody) && typeof unknownBody.error === 'string') {
+      throw new Error(unknownBody.error)
+    }
+
+    throw new Error('Request failed.')
   }
 
-  return response.json() as Promise<T>
+  return response.json()
 }
 
 function mapSearchResults(data: GeocodingResponse): Location[] {
-  if (!data.results) {
-    return []
-  }
-
-  return data.results.map((item) => ({
-    name: item.name,
-    latitude: item.latitude,
-    longitude: item.longitude,
-    country: item.country,
-  }))
+  return data.results ?? []
 }
 
-function numberAt(values: Array<number | string> | undefined, index: number): number {
-  return Number(values?.[index] ?? 0)
+function numberAt(values: Array<number | string | null>, index: number): number {
+  return readNumber(values[index])
 }
 
 function mapHourlyValues(
@@ -57,32 +130,33 @@ function mapHourlyValues(
 ): PollutantValues & { time: string } {
   return {
     time: locationTime,
-    aqi: numberAt(raw.hourly.european_aqi, index),
-    pm2_5: numberAt(raw.hourly.pm2_5, index),
-    pm10: numberAt(raw.hourly.pm10, index),
-    nitrogen_dioxide: numberAt(raw.hourly.nitrogen_dioxide, index),
-    ozone: numberAt(raw.hourly.ozone, index),
-    sulphur_dioxide: numberAt(raw.hourly.sulphur_dioxide, index),
-    carbon_monoxide: numberAt(raw.hourly.carbon_monoxide, index),
+    aqi: numberAt(readPollutantArray(raw.hourly.european_aqi), index),
+    pm2_5: numberAt(readPollutantArray(raw.hourly.pm2_5), index),
+    pm10: numberAt(readPollutantArray(raw.hourly.pm10), index),
+    nitrogen_dioxide: numberAt(readPollutantArray(raw.hourly.nitrogen_dioxide), index),
+    ozone: numberAt(readPollutantArray(raw.hourly.ozone), index),
+    sulphur_dioxide: numberAt(readPollutantArray(raw.hourly.sulphur_dioxide), index),
+    carbon_monoxide: numberAt(readPollutantArray(raw.hourly.carbon_monoxide), index),
   }
 }
 
 function mapCurrentValues(raw: AirQualityResponse): PollutantValues {
   return {
-    aqi: Number(raw.current.european_aqi ?? 0),
-    pm2_5: Number(raw.current.pm2_5 ?? 0),
-    pm10: Number(raw.current.pm10 ?? 0),
-    nitrogen_dioxide: Number(raw.current.nitrogen_dioxide ?? 0),
-    ozone: Number(raw.current.ozone ?? 0),
-    sulphur_dioxide: Number(raw.current.sulphur_dioxide ?? 0),
-    carbon_monoxide: Number(raw.current.carbon_monoxide ?? 0),
+    aqi: readNumber(raw.current.european_aqi),
+    pm2_5: readNumber(raw.current.pm2_5),
+    pm10: readNumber(raw.current.pm10),
+    nitrogen_dioxide: readNumber(raw.current.nitrogen_dioxide),
+    ozone: readNumber(raw.current.ozone),
+    sulphur_dioxide: readNumber(raw.current.sulphur_dioxide),
+    carbon_monoxide: readNumber(raw.current.carbon_monoxide),
   }
 }
 
 /** Searches Open-Meteo geocoding for matching locations. */
 export async function searchCities(name: string, signal: AbortSignal): Promise<Location[]> {
   const url = `${API_BASE}/geocoding?name=${encodeURIComponent(name)}`
-  const data = await readJson<GeocodingResponse>(url, signal)
+  const unknownData = await readJson(url, signal)
+  const data = validateGeocodingResponse(unknownData)
   return mapSearchResults(data)
 }
 
@@ -94,8 +168,9 @@ export async function getCoordinates(
   locationName = 'Selected location',
 ): Promise<AirQualityData> {
   const url = `${API_BASE}/coordinates?latitude=${latitude}&longitude=${longitude}`
-  const raw = await readJson<AirQualityResponse>(url, signal)
-  const times = (raw.hourly.time ?? []) as string[]
+  const unknownData = await readJson(url, signal)
+  const raw = validateAirQualityResponse(unknownData)
+  const times = readStringArray(raw.hourly.time)
   const hourly = times
     .slice(0, 48)
     .map((time, index) => mapHourlyValues(raw, time, index))

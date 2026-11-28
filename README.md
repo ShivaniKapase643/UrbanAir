@@ -4,8 +4,8 @@
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
 ![React](https://img.shields.io/badge/React-Vite-61dafb)
-![Tests](https://img.shields.io/badge/tests-36%20passing-brightgreen)
-![Coverage](https://img.shields.io/badge/coverage-98.76%25%20statements%20%7C%2086.66%25%20branches-brightgreen)
+![Tests](https://img.shields.io/badge/tests-60%20passing-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-99.53%25%20statements%20%7C%2091.12%25%20branches-brightgreen)
 ![Lighthouse](https://img.shields.io/badge/Lighthouse-100%20perf%20%7C%20100%20a11y-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
@@ -126,12 +126,12 @@ flowchart LR
 ```text
 .
 ├── src/
-│   ├── components/        # ForecastChart and Pollutants
-│   ├── hooks/             # Debounced value handling
+│   ├── components/        # Search, AQI, advice, comparison, chart, and pollutants
+│   ├── hooks/             # Debounced search, geolocation, and air-quality loading
 │   ├── services/          # API client and client-side cache
 │   ├── utils/             # AQI categories and rule-based advice
 │   ├── types/             # Shared TypeScript contracts
-│   ├── App.tsx            # Application composition
+│   ├── App.tsx            # Thin application composition root
 │   └── index.css          # Theme, focus, dark mode, and responsive styles
 ├── server/
 │   ├── routes/            # Geocoding and coordinate routes
@@ -153,10 +153,10 @@ flowchart LR
 
 ### Prerequisites
 
-- Node.js 20 or newer
+- Node.js 22.12 or newer
 - npm 10 or newer
 
-CI is configured for Node.js 20. No `engines` field is declared in `package.json`, so Node.js 20 is the documented compatibility baseline.
+CI uses Node.js 22.12.0, matching Vitest 5.1.1 and `package.json` engine metadata.
 
 ### Installation
 
@@ -304,9 +304,9 @@ The full threat model is in [SECURITY.md](SECURITY.md).
 | Accessibility | 100 |
 | Best Practices | 96 |
 | SEO | 91 |
-| Production JavaScript | 197.29 kB (62.89 kB gzip) |
-| Lazy chart chunk | 1.41 kB (0.70 kB gzip) |
-| Production CSS | 7.07 kB (2.29 kB gzip) |
+| Production JavaScript | 200.18 kB (63.83 kB gzip) |
+| Lazy chart chunk | 1.50 kB (0.76 kB gzip) |
+| Production CSS | 5.80 kB (1.98 kB gzip) |
 | HTML | 0.60 kB (0.36 kB gzip) |
 
 The full report is linked in [lighthouse-results.json](lighthouse-results.json).
@@ -318,8 +318,8 @@ The full report is linked in [lighthouse-results.json](lighthouse-results.json).
 - Component tests cover search, loaded results, geolocation states, comparison, chart alternatives, and accessibility.
 - API tests cover health, invalid coordinates and city names, security headers, and upstream failure.
 - Network access is mocked; tests do not call the real upstream API.
-- Latest full run: 36 tests across 8 test files pass.
-- Coverage: 98.76% statements, 86.66% branches, 95.65% functions, and 100% lines.
+- Latest full run: 60 tests across 11 test files pass.
+- Coverage: 99.53% statements, 91.12% branches, 100% functions, and 99.51% lines.
 - CI runs lint, coverage tests, build, and audit.
 
 ### 5. Accessibility
